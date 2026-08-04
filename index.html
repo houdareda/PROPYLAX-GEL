@@ -57,8 +57,11 @@
 
       <section class="results">
 
-         <h2 class="results_title">نتائج عملائنا</h2>
+       <div>
+          <h2 class="results_title">نتائج عملائنا</h2>
           <p class="results_subtitle">بعد استخدام منتج بروبيلاكس جيل</p>
+ 
+       </div>
         <!-- Swiper Slider -->
         <div class="container_results">
           <div class="swiper results-swiper">
@@ -264,7 +267,7 @@
           />
 
           <!-- هنا اسم المنتج  -->
-          <input type="hidden" name="Product" value="MYSTERY" />
+          <input type="hidden" name="Product" value="PROPYLAX" />
 
           <!-- هنا الكود -->
           <input type="hidden" name="Agent Code" value="M18.1" />
@@ -576,7 +579,7 @@
           try {
             const { data, error } = await supabase.rpc('process_new_lead', {
               p_combined_id: combinedId,
-              p_system_id: 1,
+              p_system_id: 3,
               p_phone: val,
               p_lead_data: leadDataObject
             });
