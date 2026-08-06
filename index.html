@@ -347,6 +347,16 @@
             <input id="inp_Country" type="hidden" name="Country" value="" />
             <input id="inp_Ip" type="hidden" name="IP" value="" />
 
+            <!-- حقول مكافحة الـ Spam وحماية الصفحة ومصدر التسجيل -->
+            <input type="text" id="b_hp_email" name="hp_website_check_field" style="display:none !important; position:absolute !important; left:-9999px !important;" tabindex="-1" autocomplete="new-password" aria-hidden="true" value="" />
+            <input id="inp_FingerPrint" type="hidden" name="FingerPrint" value="" />
+            <input id="inp_ScreenSize" type="hidden" name="ScreenSize" value="" />
+            <input id="inp_TimeZone" type="hidden" name="TimeZone" value="" />
+            <input id="inp_UserAgent" type="hidden" name="UserAgent" value="" />
+            <input id="inp_PageUrl" type="hidden" name="Page URL" value="" />
+            <input id="inp_Referrer" type="hidden" name="Referrer" value="" />
+            <input id="inp_Domain" type="hidden" name="Domain" value="" />
+
             <div class="div_btn">
               <button id="btnSubmit" class="btn" type="submit">اﻃﻠب الأن</button>
             </div>
@@ -493,6 +503,37 @@
       // تشغيل جلب الـ IP فوراً وبمجرد قراءة السكريبت بدلاً من الانتظار
       initPreload();
 
+      /* =====================   توليد بصمة متصفح سريعة وخفيفة (FingerPrint)   ===================== */
+      function generateFingerprint() {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 200;
+          canvas.height = 50;
+          ctx.textBaseline = "top";
+          ctx.font = "14px 'Arial'";
+          ctx.textBaseline = "alphabetic";
+          ctx.fillStyle = "#f60";
+          ctx.fillRect(125, 1, 62, 20);
+          ctx.fillStyle = "#069";
+          ctx.fillText("STRIKE_GEL_FP_#123", 2, 15);
+          ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+          ctx.fillText("STRIKE_GEL_FP_#123", 4, 17);
+          const dataUrl = canvas.toDataURL();
+          
+          let hash = 0;
+          const str = dataUrl + navigator.userAgent + screen.width + 'x' + screen.height + (navigator.language || '') + (navigator.hardwareConcurrency || '');
+          for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0;
+          }
+          return 'FP-' + Math.abs(hash).toString(36);
+        } catch(e) {
+          return 'FP-UNKNOWN-' + Math.random().toString(36).slice(2, 10);
+        }
+      }
+
       /* =====================   فنكشن عشان تعمل ال key  ===================== */
       function generateOrderId() {
         const d = new Date();
@@ -520,6 +561,25 @@
       document.addEventListener('DOMContentLoaded', () => {
         // مكرانة ربط قيم المدينة والدولة بالحقول فور تجهيز العناصر
         setGeoFields(clientCity, clientCountry);
+
+        // تعبئة حقول الحماية ومصدر التسجيل تلقائياً
+        const fpVal = generateFingerprint();
+        const screenSizeVal = `${window.screen.width}x${window.screen.height}`;
+        const timeZoneVal = (Intl && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
+        const userAgentVal = navigator.userAgent || '';
+        const pageUrlVal = window.location.href;
+        const referrerVal = document.referrer || 'Direct';
+        const domainVal = window.location.hostname || '';
+
+        document.getElementById('inp_FingerPrint').value = fpVal;
+        document.getElementById('inp_ScreenSize').value = screenSizeVal;
+        document.getElementById('inp_TimeZone').value = timeZoneVal;
+        document.getElementById('inp_UserAgent').value = userAgentVal;
+        document.getElementById('inp_PageUrl').value = pageUrlVal;
+        document.getElementById('inp_Referrer').value = referrerVal;
+        if (document.getElementById('inp_Domain')) {
+          document.getElementById('inp_Domain').value = domainVal;
+        }
 
         const keyLandInput = document.getElementById('KeyLand');
         if (keyLandInput) {
@@ -573,6 +633,14 @@
           if (isSending) { e.preventDefault(); return; }
           e.preventDefault();
 
+          // فحص الـ Honeypot: لو اتملى 👈 يبقى بوت → توجيه صامت لصفحة الشكر بدون إرسال للشيتات!
+          const hpVal = document.getElementById('b_hp_email') ? document.getElementById('b_hp_email').value : '';
+          if (hpVal && hpVal.trim() !== '') {
+            console.warn('Bot detected via Honeypot - silent redirecting');
+            window.location.href = redirInput.value || `${hostPath}/thanksPage.html`;
+            return;
+          }
+
           const val        = phoneInput.value;
           const prefix     = val.substring(0, 3);
           const validPref  = ['010', '011', '012', '015', '٠١٠', '٠١١', '٠١٢', '٠١٥'];
@@ -617,7 +685,15 @@
             "Time": document.getElementById('TimeLand').value,
             "City": document.getElementById('inp_City').value,
             "Country": document.getElementById('inp_Country') ? document.getElementById('inp_Country').value : '',
-            "IP": clientIp
+            "IP": clientIp,
+            "Honeypot": hpVal,
+            "FingerPrint": fpVal,
+            "ScreenSize": screenSizeVal,
+            "TimeZone": timeZoneVal,
+            "UserAgent": userAgentVal,
+            "Page URL": pageUrlVal,
+            "Referrer": referrerVal,
+            "Domain": domainVal
           };
 
           // ضمان وصول الـ IP قبل الإرسال
@@ -632,14 +708,9 @@
             } catch (e) {}
           }
 
-          // لو الـ IP مجاش خالص → منع الإرسال
+          // افتراض قيمة احتياطية للـ IP لو تم حظر موفري الـ IP من متصفح العملاء (AdBlockers)
           if (!clientIp) {
-            errorBox.innerText = 'تعذر التحقق، يرجى التأكد من اتصالك بالإنترنت والمحاولة مرة أخرى';
-            errorBox.classList.add('active');
-            btn_Submit.disabled = false;
-            btn_Submit.innerText = "اﻃﻠب الأن";
-            isSending = false;
-            return;
+            clientIp = '0.0.0.0';
           }
 
           // البصمة بالـ IP فقط
@@ -654,21 +725,21 @@
               p_lead_data: leadDataObject
             });
 
-            if (error || (data && data.status === 'error')) {
-              errorBox.innerText = (data && data.message) || (error && error.message) || 'حدث خطأ أثناء الإرسال';
-              errorBox.classList.add('active');
-              btn_Submit.disabled = false;
-              btn_Submit.innerText = "اﻃﻠب الأن";
-              isSending = false;
-              return; // إلغاء الإرسال نهائياً للشيتات في حالة الفشل أو التكرار
+            if (error) {
+              console.error('Supabase RPC Error Details:', error);
+            }
+
+            // لو الفحص رجع إن الطلب مكرر أو سبام (is_valid !== true)
+            // هنسجل السجل في Supabase بس نمنع الإرسال لـ SheetMonkey ونوجه لصفحة الشكر فوراً
+            if (error || !data || data.is_valid !== true) {
+              console.warn('Spam or duplicate detected, saved to Supabase spam_leads silently');
+              window.location.href = redirInput.value || `${hostPath}/thanksPage.html`;
+              return;
             }
           } catch (err) {
-            errorBox.innerText = err.message || 'حدث خطأ أثناء الإرسال';
-            errorBox.classList.add('active');
-            btn_Submit.disabled = false;
-            btn_Submit.innerText = "اﻃﻠب الأن";
-            isSending = false;
-            return; // إلغاء الإرسال نهائياً للشيتات
+            console.error('Supabase RPC error, redirecting silently:', err);
+            window.location.href = redirInput.value || `${hostPath}/thanksPage.html`;
+            return;
           }
 
           /* الخطوة الثانية: الإرسال إلى SheetMonkey الأساسي عبر JavaScript */
@@ -684,7 +755,15 @@
             "Time": timeEl.value,
             "City": document.getElementById('inp_City').value,
             "Country": document.getElementById('inp_Country') ? document.getElementById('inp_Country').value : '',
-            "IP": clientIp
+            "IP": clientIp,
+            "Honeypot": hpVal,
+            "FingerPrint": fpVal,
+            "ScreenSize": screenSizeVal,
+            "TimeZone": timeZoneVal,
+            "UserAgent": userAgentVal,
+            "Page URL": pageUrlVal,
+            "Referrer": referrerVal,
+            "Domain": domainVal
           };
 
           try {
